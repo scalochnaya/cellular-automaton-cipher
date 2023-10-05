@@ -1,6 +1,7 @@
-﻿#include <iostream>
-#include <bitset>
+#include <iostream>
 #include <fstream>
+#include <bitset>
+#include <vector>
 
 using namespace std;
 
@@ -24,7 +25,7 @@ public:
 
     void print()
     {
-        cout << "Invalid arguement - '" << invalidArg << "'. Use -d to decipher, -c to cipher\n";
+        cout << "Invalid argument - '" << invalidArg << "'. Use -d to decipher, -c to cipher\n";
     }
 };
 
@@ -42,6 +43,29 @@ public:
     }
 };
 
+class InvalidRule : public exception
+{
+private:
+    char* invalidArg;
+
+public:
+    InvalidRule(char* arg) { invalidArg = arg; }
+
+    void print()
+    {
+        cout << "Invalid argument - '" << invalidArg << "'. Use integer num to set a new rule\n";
+    }
+};
+
+class ArgumentLoss : public exception
+{
+public:
+    void print()
+    {
+        cout << "Argument loss\n";
+    }
+};
+
 int activeRule = 228;
 void setRule(int r)
 {
@@ -51,22 +75,29 @@ void setRule(int r)
 
 class Cube
 {
-private:
+protected:
     bitset<8> b;
 
 public:
     Cube(char convert) { bitset<8> a(convert); b = a; }
 
-    bitset<1> operator[](int index) { return b.test(index); }
+    bitset<1> operator[](int index) { return b.test(index); } // правило индексации пусть как в дискре будет
 
-    //void printCube() { cout << b; }
+    char getSymbol() { return (char)b.to_ulong(); }
 };
 
-void createField()//в аргументе файл
+class Text
 {
-    // создает первичный слой кубов 
-    // читает побайтово и преобразует в кубы
-}
+protected:
+    vector<Cube> field;
+
+public:
+    Text()
+    {
+        // конструктор принимает файл и считывает хексдамп в кубы
+    }
+
+};
 
 
 
@@ -83,61 +114,102 @@ int decipher()
 
 
 
-int main(int argc, char* argv[]) // в мейн поступает путь к файлу
+int main(int argc, char* argv[])
 {
     try
     {
-        //если программа вызвана без аргументов
-        if (argc == 1) throw NullInputFile();
+        if (argc == 1)
+            throw NullInputFile();
 
-        // иначе открываем директорию, указанную argv
-        ifstream inputFile(argv[2], ios::in | ios::binary);
+        if (!argv[2])
+            throw ArgumentLoss();
+
+        ifstream inputFile(argv[2], ios::binary);
+        
         if (!inputFile)
             throw FailedToOpenFile(argv[2]);
-        //cout << "Successfully opened file\n";
+        cout << "* Successfully opened file *\n";
 
-        //проверка на то, меняется ли правило с дефолтного на пользовательское
+        inputFile.seekg(0, ios::end);
+        int sizeOfFile = inputFile.tellg();
+        inputFile.seekg(0, ios::beg);
+        cout << "* File size: " << sizeOfFile << " *\n";
+
         if (argc > 3)
         {
             if (argv[3][0] == '-' && argv[3][1] == 'r')
             {
-                // + проверка на дурака
-                setRule(atoi(argv[4]));
-                //cout << "New rule is set\n";
+                if (!argv[4])
+                {
+                    inputFile.close();
+                    throw ArgumentLoss();
+                }
+
+                if (atoi(argv[4]))
+                {
+                    setRule(atoi(argv[4]));
+                    cout << "* New rule is set *\n";
+                }
+                else
+                {
+                    inputFile.close();
+                    throw InvalidRule(argv[4]);
+                }
             }
             else
+            {
+                inputFile.close();
                 throw InvalidCommandLineParameter(argv[3]);
+            }
         }
-        //что делаем с файлом
+
         if (argv[1][0] == '-')
         {
-            switch (argv[1][1]) // свич по приколу
+            if (argv[1][1] == 'd')
             {
-            case 'd':
-                //cout << "is -d\n";
+                cout << "* is -d *\n";
                 decipher();
-                break;
-            case 'c':
-                //cout << "is -c\n";
+            }
+            else if (argv[1][1] == 'c')
+            {
+                cout << "* is -c *\n";
                 cipher();
-                break;
-            default:
+            }
+            else
+            {
+                inputFile.close();
                 throw InvalidCommandLineParameter(argv[1]);
-                break;
             }
         }
         else
+        {
+            inputFile.close();
             throw InvalidCommandLineParameter(argv[1]);
+        }
 
+
+
+        ofstream outputFile("result", ios::binary);
+        if (outputFile)
+        {
+            //пока просто копирование в файл без расширения
+            Cube c('a');
+            for (int i = 0; i < sizeOfFile; i++)
+            {
+                c = inputFile.get();
+                outputFile << c.getSymbol();
+            }
+
+            outputFile.close();
+        }
 
         inputFile.close();
-
-        //создает новый файл в той же директории
-
     }
     catch (NullInputFile e) { e.print(); }
     catch (FailedToOpenFile e) { e.print(); }
     catch (InvalidCommandLineParameter e) { e.print(); }
+    catch (InvalidRule e) { e.print(); }
+    catch (ArgumentLoss e) { e.print(); }
     catch (...) { cout << "Smthng went wrong...\n"; }
 
     return 0;
