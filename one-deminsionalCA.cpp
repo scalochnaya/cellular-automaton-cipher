@@ -1,6 +1,7 @@
 #include <iostream>
 #include <bitset>
 #include <vector>
+//#include "windows.h"
 
 #define COUNT 128 //количество клеток в линии
 
@@ -52,6 +53,8 @@ int main()
 	{
 		printWorld(world);
 		updateAutomaton(world, rules);
+		//Sleep(1000);
+		//system("cls");
 	}
 
 }
